@@ -2,7 +2,33 @@
 
 const projectName = 'TraderX'
 const projectSlug = 'traderX'
-const copyrightOwner = 'FINOS - The Fintech Open Source Foundation'
+const docsUrl = process.env.DOCUSAURUS_URL || 'https://traderx.finos.org'
+const docsBaseUrl = process.env.DOCUSAURUS_BASE_URL || '/'
+
+function pathBrowserPolyfillPlugin() {
+  return {
+    name: 'path-browser-polyfill',
+    configureWebpack() {
+      return {
+        resolve: {
+          fallback: {
+            path: require.resolve('path-browserify'),
+          },
+        },
+      }
+    },
+  }
+}
+
+function mermaidZoomClientPlugin() {
+  return {
+    name: 'mermaid-zoom-client',
+    getClientModules() {
+      return [require.resolve('./src/mermaid-zoom-client.js')]
+    },
+  }
+}
+
 
 // GitHub repo configuration - update these for forks/branches
 const repoOwner = 'finos';
@@ -21,8 +47,8 @@ module.exports = {
   onBrokenLinks: 'ignore',
   title: `${projectName}`,
   tagline: `${projectName}`, 
-  url: 'https://finos.org',
-  baseUrl: '/',
+  url: docsUrl,
+  baseUrl: docsBaseUrl,
   trailingSlash: false,
   favicon: 'img/favicon/favicon-traderX.ico',
   projectName: `${projectName}`,
@@ -32,6 +58,10 @@ module.exports = {
   },
   scripts: ['https://buttons.github.io/buttons.js'],
   stylesheets: ['https://fonts.googleapis.com/css?family=Overpass:400,400i,700'],
+  markdown: {
+    mermaid: true,
+  },
+  themes: ['@docusaurus/theme-mermaid'],
   themeConfig: {
     navbar: {
       title: `TraderX`,
@@ -40,21 +70,25 @@ module.exports = {
         src: 'img/favicon/favicon-traderX.ico',
       },
       items: [
-        {to: 'docs/home', label: 'Docs', position: 'right'},
-        {to: 'docs/roadmap', label: 'Roadmap', position: 'right'},
-        {to: 'docs/project-history', label: 'History', position: 'right'},
+        {to: '/docs/home', label: 'Overview', position: 'right'},
+        {to: '/docs/spec-kit/getting-started-with-traderx', label: 'Getting Started', position: 'right'},
+        {to: '/specs', label: 'Specs', position: 'right'},
+        {to: '/docs/spec-kit/state-docs', label: 'State Docs', position: 'right'},
+        {to: '/docs/adr', label: 'ADRs', position: 'right'},
+        {to: '/docs/learning', label: 'Learning', position: 'right'},
+        {type: 'search', position: 'right'},
         {
-          href: 'https://github.com/finos/',
+          href: repoUrl,
           label: 'GitHub',
           position: 'right',
         }
       ],
     },
     footer: {
-      copyright: `Copyright © ${new Date().getFullYear()} TraderX - ${copyrightOwner}`,
+      copyright: `Copyright © ${new Date().getFullYear()} Fintech Open Source Foundation.`,
       logo: {
-        alt: 'FINOS Logo',
-        src: 'img/favicon/favicon-finos.ico',
+        alt: 'Fintech Open Source Foundation Logo',
+        src: 'img/finos/finos-white.png',
         href: 'https://finos.org'
       },
       links: [
@@ -62,16 +96,32 @@ module.exports = {
           title: 'Docs',
           items: [
             {
+              label: 'Home',
+              to: '/docs/home',
+            },
+            {
+              label: 'Blog',
+              to: '/docs/blog',
+            },
+            {
               label: 'Getting Started',
-              to: 'docs/home',
+              to: '/docs/spec-kit/getting-started-with-traderx',
             },
             {
-              label: 'Roadmap',
-              to: 'docs/roadmap',
+              label: 'Learning Paths',
+              to: '/docs/learning-paths',
             },
             {
-              label: 'Project History',
-              to: 'docs/project-history',
+              label: 'Learning Guides',
+              to: '/docs/learning',
+            },
+            {
+              label: 'Specs',
+              to: '/specs',
+            },
+            {
+              label: 'Source Code',
+              to: repoUrl,
             }
           ]
         },
@@ -118,17 +168,61 @@ module.exports = {
       {
         docs: {
           path: '../docs',
-          // Build edit links explicitly to include branch + docs prefix
-          editUrl: ({docPath}) => `${repoUrl}/edit/${repoBranch}/docs/${docPath}`,
-          sidebarPath: require.resolve('./sidebars.js'),
-          remarkPlugins: [
-            [transformRelativeLinks, { repoUrl, branch: repoBranch }],
-          ],
+          exclude: ['prompt-ideas/**', 'migration/**', 'migration/**/*', '**/migration/**', 'guide/adr/**', 'guide/adr/**/*'],
+          editUrl:
+            'https://github.com/finos/traderX/edit/main/website/',
+          sidebarPath: require.resolve('./sidebars.js')
         },
         theme: {
           customCss: require.resolve('./src/css/custom.css'),
         }
       }
     ]
-  ]
+  ],
+  plugins: [
+    [
+      require.resolve('docusaurus-lunr-search'),
+      {
+        languages: ['en'],
+      },
+    ],
+    [
+      'docusaurus-plugin-llms',
+      {
+        docsDir: '../docs',
+        includeBlog: false,
+        generateLLMsTxt: true,
+        generateLLMsFullTxt: true,
+        generateMarkdownFiles: false,
+        excludeImports: true,
+        removeDuplicateHeadings: true,
+      },
+    ],
+    [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'traderspec-root-specs',
+        path: '../specs',
+        routeBasePath: 'specs',
+        sidebarPath: require.resolve('./traderspec-root-specs.sidebars.js'),
+        sidebarItemsGenerator: require('./plugins/specs-sidebar-items-generator'),
+        remarkPlugins: [require('./plugins/remark-speckit-reference-links')],
+        include: ['**/*.md'],
+        editUrl: 'https://github.com/finos/traderX/edit/main/specs/',
+      },
+    ],
+    [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'traderspec-specify',
+        path: '../.specify',
+        routeBasePath: 'specify',
+        sidebarPath: require.resolve('./traderspec-specify.sidebars.js'),
+        include: ['memory/**/*.md'],
+        editUrl: 'https://github.com/finos/traderX/edit/main/.specify/',
+      },
+    ],
+    mermaidZoomClientPlugin,
+    pathBrowserPolyfillPlugin,
+  ],
 };
