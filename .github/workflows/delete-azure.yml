@@ -95,27 +95,6 @@ jobs:
       - name: Set up control plane
         uses: radius-project/radius/.github/extension/actions/setup-control-plane@main
 
-      # TEMPORARY: pin the ephemeral control plane to the build from
-      # radius-project/radius#12842 so the paginated nextLink fix is exercised
-      # end to end. Remove this step once that pull request merges into main.
-      - name: Use pull request build of Radius (radius#12842)
-        env:
-          RADIUS_PR_IMAGE_TAG: pr-funcc0f94ae96d
-        run: |
-          set -euo pipefail
-          kubectl set image -n radius-system deployment/ucp \
-            ucp="ghcr.io/radius-project/dev/ucpd:${RADIUS_PR_IMAGE_TAG}"
-          kubectl set image -n radius-system deployment/dynamic-rp \
-            dynamic-rp="ghcr.io/radius-project/dev/dynamic-rp:${RADIUS_PR_IMAGE_TAG}"
-          kubectl set image -n radius-system deployment/applications-rp \
-            applications-rp="ghcr.io/radius-project/dev/applications-rp:${RADIUS_PR_IMAGE_TAG}"
-          for deploy in ucp dynamic-rp applications-rp; do
-            kubectl rollout status "deployment/$deploy" -n radius-system --timeout=300s
-          done
-          echo "Control plane images in use:"
-          kubectl get deployment -n radius-system \
-            -o custom-columns=NAME:.metadata.name,IMAGE:.spec.template.spec.containers[0].image
-
       - name: Project cloud OIDC tokens into Radius pods
         run: |
           # Mint GitHub OIDC tokens and mount them where Radius expects them, so the
