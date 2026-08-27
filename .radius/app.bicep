@@ -2,10 +2,37 @@ extension radius
 
 param environment string
 
+@description('Username for the OCI registry the containerImages recipe pushes to (the GitHub actor for ghcr.io).')
+param registryUsername string
+
+@description('Password/token for the OCI registry the containerImages recipe pushes to (a GitHub token with write:packages for ghcr.io).')
+@secure()
+param registryPassword string
+
 resource traderxApp 'Radius.Core/applications@2025-08-01-preview' = {
   name: 'traderx'
   properties: {
     environment: environment
+  }
+}
+
+// Registry push credentials for the containerImages recipe. The name MUST be
+// exactly 'radius-ghcr-registry-creds' to match the recipe pack's
+// containerImagesRegistrySecretName -- the recipe reads the push credentials
+// from a Secret of that name on the target cluster.
+resource registryCreds 'Radius.Security/secrets@2025-08-01-preview' = {
+  name: 'radius-ghcr-registry-creds'
+  properties: {
+    environment: environment
+    application: traderxApp.id
+    data: {
+      username: {
+        value: registryUsername
+      }
+      password: {
+        value: registryPassword
+      }
+    }
   }
 }
 
@@ -123,6 +150,9 @@ resource databaseImage 'Radius.Compute/containerImages@2025-08-01-preview' = {
       source: 'git::https://github.com/willtsai/traderX.git//templates/database-specfirst?ref=f8d5532d8b2bc208ae15d8c11ca7559e1ad5c788'
     }
   }
+  dependsOn: [
+    registryCreds
+  ]
 }
 
 resource referenceDataImage 'Radius.Compute/containerImages@2025-08-01-preview' = {
@@ -134,6 +164,9 @@ resource referenceDataImage 'Radius.Compute/containerImages@2025-08-01-preview' 
       source: 'git::https://github.com/willtsai/traderX.git//templates/reference-data-specfirst?ref=f8d5532d8b2bc208ae15d8c11ca7559e1ad5c788'
     }
   }
+  dependsOn: [
+    registryCreds
+  ]
 }
 
 resource tradeFeedImage 'Radius.Compute/containerImages@2025-08-01-preview' = {
@@ -145,6 +178,9 @@ resource tradeFeedImage 'Radius.Compute/containerImages@2025-08-01-preview' = {
       source: 'git::https://github.com/willtsai/traderX.git//templates/trade-feed-specfirst?ref=f8d5532d8b2bc208ae15d8c11ca7559e1ad5c788'
     }
   }
+  dependsOn: [
+    registryCreds
+  ]
 }
 
 resource peopleServiceImage 'Radius.Compute/containerImages@2025-08-01-preview' = {
@@ -156,6 +192,9 @@ resource peopleServiceImage 'Radius.Compute/containerImages@2025-08-01-preview' 
       source: 'git::https://github.com/willtsai/traderX.git//templates/people-service-specfirst?ref=f8d5532d8b2bc208ae15d8c11ca7559e1ad5c788'
     }
   }
+  dependsOn: [
+    registryCreds
+  ]
 }
 
 resource accountServiceImage 'Radius.Compute/containerImages@2025-08-01-preview' = {
@@ -167,6 +206,9 @@ resource accountServiceImage 'Radius.Compute/containerImages@2025-08-01-preview'
       source: 'git::https://github.com/willtsai/traderX.git//templates/account-service-specfirst?ref=f8d5532d8b2bc208ae15d8c11ca7559e1ad5c788'
     }
   }
+  dependsOn: [
+    registryCreds
+  ]
 }
 
 resource positionServiceImage 'Radius.Compute/containerImages@2025-08-01-preview' = {
@@ -178,6 +220,9 @@ resource positionServiceImage 'Radius.Compute/containerImages@2025-08-01-preview
       source: 'git::https://github.com/willtsai/traderX.git//templates/position-service-specfirst?ref=f8d5532d8b2bc208ae15d8c11ca7559e1ad5c788'
     }
   }
+  dependsOn: [
+    registryCreds
+  ]
 }
 
 resource tradeProcessorImage 'Radius.Compute/containerImages@2025-08-01-preview' = {
@@ -189,6 +234,9 @@ resource tradeProcessorImage 'Radius.Compute/containerImages@2025-08-01-preview'
       source: 'git::https://github.com/willtsai/traderX.git//templates/trade-processor-specfirst?ref=f8d5532d8b2bc208ae15d8c11ca7559e1ad5c788'
     }
   }
+  dependsOn: [
+    registryCreds
+  ]
 }
 
 resource tradeServiceImage 'Radius.Compute/containerImages@2025-08-01-preview' = {
@@ -200,6 +248,9 @@ resource tradeServiceImage 'Radius.Compute/containerImages@2025-08-01-preview' =
       source: 'git::https://github.com/willtsai/traderX.git//templates/trade-service-specfirst?ref=f8d5532d8b2bc208ae15d8c11ca7559e1ad5c788'
     }
   }
+  dependsOn: [
+    registryCreds
+  ]
 }
 
 resource webImage 'Radius.Compute/containerImages@2025-08-01-preview' = {
@@ -211,6 +262,9 @@ resource webImage 'Radius.Compute/containerImages@2025-08-01-preview' = {
       source: 'git::https://github.com/willtsai/traderX.git//templates/web-front-end/angular?ref=f8d5532d8b2bc208ae15d8c11ca7559e1ad5c788'
     }
   }
+  dependsOn: [
+    registryCreds
+  ]
 }
 
 resource databaseContainer 'Radius.Compute/containers@2025-08-01-preview' = {
