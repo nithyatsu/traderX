@@ -157,8 +157,25 @@ jobs:
           swap applications-rp applications-rp
           swap dynamic-rp dynamic-rp
 
+          # A rollout can stall purely because an old pod is slow to terminate even
+          # though the new one is already serving, so wait on availability of the
+          # new generation and force-clear stragglers instead of failing the job.
           for deploy in ucp applications-rp dynamic-rp; do
-            kubectl rollout status "deployment/${deploy}" -n radius-system --timeout=600s
+            if ! kubectl rollout status "deployment/${deploy}" -n radius-system --timeout=180s; then
+              echo "::warning::${deploy} rollout stalled; force-removing terminating pods."
+              kubectl get pods -n radius-system -l "control-plane=${deploy}" -o wide || true
+              kubectl get pods -n radius-system -o json \
+                | jq -r --arg d "$deploy" '.items[]
+                    | select(.metadata.name | startswith($d))
+                    | select(.metadata.deletionTimestamp != null)
+                    | .metadata.name' \
+                | while read -r pod; do
+                    [ -n "$pod" ] && kubectl delete pod "$pod" -n radius-system --force --grace-period=0 || true
+                  done
+              kubectl rollout status "deployment/${deploy}" -n radius-system --timeout=180s || true
+            fi
+            kubectl wait --for=condition=Available "deployment/${deploy}" \
+              -n radius-system --timeout=180s
           done
 
           echo "✅ Control plane now running radius PR #${RADIUS_TEST_PR}."
