@@ -142,13 +142,16 @@ jobs:
           make copy-manifests
           make docker-build-ucpd docker-build-applications-rp docker-build-dynamic-rp
 
-          # Deployment name in radius-system -> image name in APPS_MAP.
+          # Deployment name in radius-system -> image name in APPS_MAP. The main
+          # container shares the deployment's name; target it explicitly because a
+          # wildcard would also overwrite the init containers (terraform-init,
+          # buildkit-*, append-root-ca), which run unrelated images.
           swap() {
             deployment="$1"
             image="${DOCKER_REGISTRY}/$2:${DOCKER_TAG_VERSION}"
             docker image inspect "$image" >/dev/null
             k3d image import "$image" -c radius-cp
-            kubectl set image -n radius-system "deployment/${deployment}" "*=${image}"
+            kubectl set image -n radius-system "deployment/${deployment}" "${deployment}=${image}"
             kubectl patch deployment "$deployment" -n radius-system --type=json \
               -p='[{"op":"replace","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"IfNotPresent"}]'
           }
@@ -172,10 +175,11 @@ jobs:
                 | while read -r pod; do
                     [ -n "$pod" ] && kubectl delete pod "$pod" -n radius-system --force --grace-period=0 || true
                   done
-              kubectl rollout status "deployment/${deploy}" -n radius-system --timeout=180s || true
+              kubectl rollout status "deployment/${deploy}" -n radius-system --timeout=240s
             fi
-            kubectl wait --for=condition=Available "deployment/${deploy}" \
-              -n radius-system --timeout=180s
+            # `condition=Available` alone can be satisfied by a surviving old pod, so
+            # assert the new generation is the one that is actually serving.
+            kubectl rollout status "deployment/${deploy}" -n radius-system --timeout=120s
           done
 
           echo "✅ Control plane now running radius PR #${RADIUS_TEST_PR}."
